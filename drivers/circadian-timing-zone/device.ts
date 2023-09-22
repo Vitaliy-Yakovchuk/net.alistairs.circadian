@@ -107,7 +107,7 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
       brightness = await this._calcCircadianBrightness(mode);
     } else {
       const fade = await this._calcPrevNextFade(prevItem, nextItem)
-      const prevBrightness = await this._calcItemBrightness(prevItem, mode);
+      const prevBrightness = await this._calcItemPrevBrightness(prevItem, mode);
       const nextBrightness = await this._calcItemBrightness(nextItem, mode);
       brightness = prevBrightness * (1 - fade) + nextBrightness * fade;
     }
@@ -117,7 +117,7 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
       temperature = await this._calcCircadianTemperature(mode);
     } else {
       const fade = await this._calcPrevNextFade(prevItem, nextItem)
-      const prevTemperature = await this._calcItemTemperature(prevItem, mode);
+      const prevTemperature = await this._calcItemPrevTemperature(prevItem, mode);
       const nextTemperature = await this._calcItemTemperature(nextItem, mode);
       temperature = prevTemperature * (1 - fade) + nextTemperature * fade;
     }
@@ -182,8 +182,7 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
 
     const fadeDuration = Math.min(await this.getFadeDuration(), diff);
 
-    const date = new Date()
-    const currentTime: Time = this._dateToLocalTime(date);;
+    const currentTime: Time = this._dateToLocalTime(new Date());
 
     diff = this._timeToInt(nextItem.time) - this._timeToInt(currentTime)
     if (diff < 0) {
@@ -217,6 +216,21 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
     return parseFloat(item.value.brightness);
   }
 
+  async _calcItemPrevBrightness(item: TimingItem, mode: string) {
+    if (item.value.brightness === 'circadian') {
+
+      return await this._calcCircadianBrightness(mode)
+    }
+    return parseFloat(item.value.brightness);
+  }
+
+  async _calcItemPrevTemperature(item: TimingItem, mode: string) {
+    if (item.value.temperature === 'circadian') {
+      return await this._calcCircadianTemperature(mode)
+    }
+    return parseFloat(item.value.temperature);
+  }
+  
   async _calcItemTemperature(item: TimingItem, mode: string) {
     if (item.value.temperature === 'circadian') {
       const date = new Date()
