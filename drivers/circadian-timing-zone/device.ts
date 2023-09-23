@@ -300,6 +300,9 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
 
     try {
       const parsedTiming: Timing = JSON.parse(timing);
+      if (Object.keys(parsedTiming).length < 2){
+        return false;
+      }
       for (const time in parsedTiming) {
         if (!this.isValidTime(time)) {
           this.log(`Time value ${time} is not valid`);

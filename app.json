@@ -275,7 +275,7 @@
               "id": "night_timing",
               "type": "textarea",
               "label": {
-                "en": "Timing JSON for the night mode"
+                "en": "Timing JSON for Night Mode"
               },
               "value": "",
               "hint": {
