@@ -30,16 +30,16 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
     changedKeys: string[]
   }): Promise<string | void> {
     if (event.changedKeys.includes('timing')) {
-      if (!this._validateTiming(event.newSettings.timing)) {
+      if (!this.validateTiming(event.newSettings.timing)) {
         return this.homey.__("json_timing_error");
       }
-      this._timings = this._parseTiming(event.newSettings.timing);
+      this._timings = this.parseTiming(event.newSettings.timing);
     }
     if (event.changedKeys.includes('night_timing')) {
-      if (!this._validateTiming(event.newSettings.night_timing)) {
+      if (!this.validateTiming(event.newSettings.night_timing)) {
         return this.homey.__("json_timing_error");
       }
-      this._nightTimings = this._parseTiming(event.newSettings.night_timing);
+      this._nightTimings = this.parseTiming(event.newSettings.night_timing);
     }
     if (event.changedKeys.includes('fade_duration')) {
       this._fadeDuration = event.newSettings.fade_duration;
@@ -52,8 +52,8 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
    */
   async onInit() {
 
-    this._timings = this._parseTiming(await this.getSetting("timing"));
-    this._nightTimings = this._parseTiming(await this.getSetting("night_timing"));
+    this._timings = this.parseTiming(await this.getSetting("timing"));
+    this._nightTimings = this.parseTiming(await this.getSetting("night_timing"));
 
     // Mode Listener
     this.registerCapabilityListener("adaptive_mode", async (value: any) => {
@@ -98,27 +98,27 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
 
     let valuesChanged: boolean = false;
     const date = new Date()
-    const currentTime: Time = this._dateToLocalTime(date);
-    const prevItem = this._findPrevItem(currentTime, mode);
-    const nextItem = this._findNextItem(currentTime, mode);
+    const currentTime: Time = this.dateToLocalTime(date);
+    const prevItem = this.findPrevItem(currentTime, mode);
+    const nextItem = this.findNextItem(currentTime, mode);
 
     let brightness: number = -1;
     if (prevItem.value.brightness === 'circadian' && nextItem.value.brightness === 'circadian') {
-      brightness = await this._calcCircadianBrightness(mode);
+      brightness = await this.calcCircadianBrightness(mode);
     } else {
-      const fade = await this._calcPrevNextFade(prevItem, nextItem)
-      const prevBrightness = await this._calcItemPrevBrightness(prevItem, mode);
-      const nextBrightness = await this._calcItemBrightness(nextItem, mode);
+      const fade = await this.calcPrevNextFade(prevItem, nextItem)
+      const prevBrightness = await this.calcItemPrevBrightness(prevItem, mode);
+      const nextBrightness = await this.calcItemBrightness(nextItem, mode);
       brightness = prevBrightness * (1 - fade) + nextBrightness * fade;
     }
 
     let temperature: number = -1;
     if (prevItem.value.temperature === 'circadian' && nextItem.value.temperature === 'circadian') {
-      temperature = await this._calcCircadianTemperature(mode);
+      temperature = await this.calcCircadianTemperature(mode);
     } else {
-      const fade = await this._calcPrevNextFade(prevItem, nextItem)
-      const prevTemperature = await this._calcItemPrevTemperature(prevItem, mode);
-      const nextTemperature = await this._calcItemTemperature(nextItem, mode);
+      const fade = await this.calcPrevNextFade(prevItem, nextItem)
+      const prevTemperature = await this.calcItemPrevTemperature(prevItem, mode);
+      const nextTemperature = await this.calcItemTemperature(nextItem, mode);
       temperature = prevTemperature * (1 - fade) + nextTemperature * fade;
     }
 
@@ -151,7 +151,7 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
     return this._fadeDuration;
   }
 
-  async _calcCircadianBrightness(mode: string, date?: Date) {
+  private async calcCircadianBrightness(mode: string, date?: Date) {
     if (mode === 'night') {
       return await this.getNightBrightness();
     }
@@ -162,7 +162,7 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
     return (percentage > 0) ? (brightnessDelta * percentage) + minBrightness : minBrightness;
   }
 
-  async _calcCircadianTemperature(mode: string, date?: Date) {
+  private async calcCircadianTemperature(mode: string, date?: Date) {
     if (mode === 'night') {
       return await this.getNightTemperature();
     }
@@ -174,17 +174,17 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
     return (percentage > 0) ? calculatedTemperature : sunsetTemp;
   }
 
-  async _calcPrevNextFade(prevItem: TimingItem, nextItem: TimingItem) {
-    let diff = this._timeToInt(nextItem.time) - this._timeToInt(prevItem.time)
+  private async calcPrevNextFade(prevItem: TimingItem, nextItem: TimingItem) {
+    let diff = this.timeToInt(nextItem.time) - this.timeToInt(prevItem.time)
     if (diff < 0) {
       diff = 24 * 60 - diff;
     }
 
     const fadeDuration = Math.min(await this.getFadeDuration(), diff);
 
-    const currentTime: Time = this._dateToLocalTime(new Date());
+    const currentTime: Time = this.dateToLocalTime(new Date());
 
-    diff = this._timeToInt(nextItem.time) - this._timeToInt(currentTime)
+    diff = this.timeToInt(nextItem.time) - this.timeToInt(currentTime)
     if (diff < 0) {
       diff = 24 * 60 - diff;
     }
@@ -195,75 +195,66 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
     return (fadeDuration - diff) / fadeDuration;
   }
 
-  _dateToLocalTime(date: Date) {
-    return this._parseTime(
-      date.toLocaleString('en-UK',
-        { minute: 'numeric', hour: 'numeric', timeZone: this.homey.clock.getTimezone() }
-      )
-    );
-  }
-
-  async _calcItemBrightness(item: TimingItem, mode: string) {
+  private async calcItemBrightness(item: TimingItem, mode: string) {
     if (item.value.brightness === 'circadian') {
       const date = new Date()
-      const currentTime = this._dateToLocalTime(date);
+      const currentTime = this.dateToLocalTime(date);
 
-      const diff = this._timeToInt(item.time) - this._timeToInt(currentTime)
+      const diff = this.timeToInt(item.time) - this.timeToInt(currentTime)
       date.setMinutes(date.getMinutes() + diff);
 
-      return await this._calcCircadianBrightness(mode, date)
+      return await this.calcCircadianBrightness(mode, date)
     }
     return parseFloat(item.value.brightness);
   }
 
-  async _calcItemPrevBrightness(item: TimingItem, mode: string) {
+  private async calcItemPrevBrightness(item: TimingItem, mode: string) {
     if (item.value.brightness === 'circadian') {
-
-      return await this._calcCircadianBrightness(mode)
+      return await this.calcCircadianBrightness(mode)
     }
     return parseFloat(item.value.brightness);
   }
 
-  async _calcItemPrevTemperature(item: TimingItem, mode: string) {
+  private async calcItemPrevTemperature(item: TimingItem, mode: string) {
     if (item.value.temperature === 'circadian') {
-      return await this._calcCircadianTemperature(mode)
+      return await this.calcCircadianTemperature(mode)
     }
     return parseFloat(item.value.temperature);
   }
   
-  async _calcItemTemperature(item: TimingItem, mode: string) {
+  private async calcItemTemperature(item: TimingItem, mode: string) {
     if (item.value.temperature === 'circadian') {
       const date = new Date()
-      const currentTime: Time = this._dateToLocalTime(date);
+      const currentTime: Time = this.dateToLocalTime(date);
 
-      const diff = this._timeToInt(item.time) - this._timeToInt(currentTime)
+      const diff = this.timeToInt(item.time) - this.timeToInt(currentTime)
       date.setMinutes(date.getMinutes() + diff);
 
-      return await this._calcCircadianTemperature(mode, date)
+      return await this.calcCircadianTemperature(mode, date)
     }
     return parseFloat(item.value.temperature);
   }
 
-  _timeToInt(time: Time) {
+  private timeToInt(time: Time) {
     return time.hours * 60 + time.minutes;
   }
 
-  _findPrevItem(time: Time, mode: string) {
-    let arr = this._getTimingArray(mode);
-    const index = this._binarySearch(arr, time) - 1;
+  private findPrevItem(time: Time, mode: string) {
+    let arr = this.getTimingArray(mode);
+    const index = this.binarySearch(arr, time) - 1;
     if (index >= 0) {
       return arr[index];
     }
     return arr[arr.length - 1];
   }
 
-  _findNextItem(time: Time, mode: string) {
-    let arr = this._getTimingArray(mode);
-    let index = this._binarySearch(arr, time);
+  private findNextItem(time: Time, mode: string) {
+    let arr = this.getTimingArray(mode);
+    let index = this.binarySearch(arr, time);
     if (index >= arr.length) {
       return arr[0];
     }
-    if (this._timeToInt(arr[index].time) === this._timeToInt(time)) {
+    if (this.timeToInt(arr[index].time) === this.timeToInt(time)) {
       index++;
     }
     if (index >= arr.length) {
@@ -272,14 +263,14 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
     return arr[index];
   }
 
-  private _getTimingArray(mode: string): TimingItem[] {
+  private getTimingArray(mode: string): TimingItem[] {
     if (mode === 'adaptive') {
       return this._timings;
     }
     return this._nightTimings;
   }
 
-  _binarySearch(arr: TimingItem[], target: Time): number {
+  private binarySearch(arr: TimingItem[], target: Time): number {
     let left = 0;
     let right = arr.length - 1;
 
@@ -289,7 +280,7 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
       if (arr[mid].time.hours === target.hours && arr[mid].time.minutes === target.minutes) {
         return mid;
       }
-      if (this._timeToInt(arr[mid].time) < this._timeToInt(target)) {
+      if (this.timeToInt(arr[mid].time) < this.timeToInt(target)) {
         left = mid + 1;
       } else {
         right = mid - 1;
@@ -300,7 +291,7 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
   }
 
 
-  _validateTiming(timing: string): boolean {
+  private validateTiming(timing: string): boolean {
     if (timing === '') {
       return true;
     }
@@ -310,14 +301,14 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
     try {
       const parsedTiming: Timing = JSON.parse(timing);
       for (const time in parsedTiming) {
-        if (!this._isValidTime(time)) {
+        if (!this.isValidTime(time)) {
           this.log(`Time value ${time} is not valid`);
           return false;
         }
 
-        const tm = this._parseTime(time);
+        const tm = this.parseTime(time);
 
-        const intTime = this._timeToInt(tm);
+        const intTime = this.timeToInt(tm);
         if (intTime <= lastTime) {
           this.log(`Time value ${time} smaller than prev time`);
           return false;
@@ -348,12 +339,12 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
     }
   }
 
-  _isValidTime(time: string): boolean {
+  private isValidTime(time: string): boolean {
     const timeRegExp = /^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/;
     return timeRegExp.test(time);
   }
 
-  _parseTiming(timing: any): TimingItem[] {
+  private parseTiming(timing: any): TimingItem[] {
     if (!timing) {
       return [];
     }
@@ -362,7 +353,7 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
     for (const time in rawTiming) {
       result.push(
         {
-          time: this._parseTime(time),
+          time: this.parseTime(time),
           value: rawTiming[time]
         }
       )
@@ -370,12 +361,20 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
     return result;
   }
 
-  _parseTime(time: string): Time {
+  private parseTime(time: string): Time {
     const [hoursStr, minutesStr] = time.split(':');
     const hours = parseInt(hoursStr, 10);
     const minutes = parseInt(minutesStr, 10);
 
     return { hours, minutes };
+  }
+
+  private dateToLocalTime(date: Date) {
+    return this.parseTime(
+      date.toLocaleString('en-UK',
+        { minute: 'numeric', hour: 'numeric', timeZone: this.homey.clock.getTimezone() }
+      )
+    );
   }
 }
 
