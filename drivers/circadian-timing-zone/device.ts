@@ -121,7 +121,7 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
       const nextTemperature = await this.calcItemTemperature(nextItem, mode);
       temperature = prevTemperature * (1 - fade) + nextTemperature * fade;
     }
-
+    brightness = Math.round(brightness * 100) / 100;
     let currentBrightness = await this.getCurrentBrightness();
     if (brightness != currentBrightness) {
       this._currentBrightness = brightness;
@@ -129,6 +129,8 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
       valuesChanged = true;
     }
     const currentTemperature = await this.getCurrentTemperature();
+
+    temperature = Math.round(temperature * 100) / 100;
 
     if (temperature != currentTemperature) {
       this._currentTemperature = temperature;
@@ -241,7 +243,11 @@ export class CircadianTimingZone extends require('../circadian-zone/device') {
 
   private findPrevItem(time: Time, mode: string) {
     let arr = this.getTimingArray(mode);
-    const index = this.binarySearch(arr, time) - 1;
+    let index = this.binarySearch(arr, time);
+    if (index < arr.length && this.timeToInt(arr[index].time) === this.timeToInt(time)) {
+      return arr[index];
+    }
+    index--;
     if (index >= 0) {
       return arr[index];
     }
